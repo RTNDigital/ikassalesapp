@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GetMerchantApiResponse } from '../app/api/ikas/get-merchant/route';
+import { ProductSearchApiResponse } from '../app/api/ikas/products/search/route';
 import { SyncOrdersApiResponse } from '../app/api/ikas/sync-orders/route';
 import { ApiResponseType } from '../globals/constants';
 
@@ -52,6 +53,10 @@ export const ApiRequests = {
       makePostRequest<{ notification: any }>({ url: `/api/ikas/notifications/${id}`, data, token }),
     remove: (token: string, id: string) =>
       makeDeleteRequest<void>({ url: `/api/ikas/notifications/${id}`, token }),
+  },
+  products: {
+    search: (token: string, q?: string) =>
+      makeGetRequest<ProductSearchApiResponse>({ url: '/api/ikas/products/search', token, data: { q: q || '' } }),
   },
   orders: {
     sync: (token: string) =>
