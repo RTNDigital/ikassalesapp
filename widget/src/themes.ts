@@ -163,6 +163,7 @@ export function getThemeCSS(theme: string, colors: ThemeColors): string {
     themeStyles = `
       .sn-modern {
         padding: 0;
+        max-width: 300px;
       }
       .sn-modern-header {
         padding: 10px 32px 8px 12px;
@@ -171,7 +172,7 @@ export function getThemeCSS(theme: string, colors: ThemeColors): string {
       }
       .sn-modern-img {
         width: 100%;
-        height: 140px;
+        max-height: 120px;
         object-fit: cover;
         display: block;
         background: #f3f4f6;
