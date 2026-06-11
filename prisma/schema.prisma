@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model AuthToken {
+  id              String   @id
+  merchantId      String
+  authorizedAppId String?  @unique
+  salesChannelId  String?
+  type            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deleted         Boolean  @default(false)
+
+  accessToken     String
+  tokenType       String
+  expiresIn       Int
+  expireDate      DateTime
+  refreshToken    String
+  scope           String?
+}
+
+model StoreSettings {
+  id               String   @id @default(cuid())
+  merchantId       String   @unique
+  isActive         Boolean  @default(true)
+  showOnMobile     Boolean  @default(true)
+  position         String   @default("bottom-left")
+  displayDuration  Int      @default(5000)
+  delayBetween     Int      @default(8000)
+  firstDelay       Int      @default(3000)
+  maxPerPage       Int      @default(10)
+  messageTemplate  String   @default("{{name}} satın aldı")
+  timeTemplate     String   @default("{{time}} önce · {{location}}")
+  dataMode         String   @default("manual")
+  autoSyncOrders   Boolean  @default(false)
+  syncOrderCount   Int      @default(50)
+  animation        String   @default("slide")
+  theme            String   @default("classic")
+  customColors     String   @default("{}")
+  customFonts      String   @default("{}")
+  showTeaser       Boolean  @default(false)
+  teaserText       String   @default("Son satışlar")
+  teaserBehavior   String   @default("after-close")
+  pageTargeting    String   @default("{\"mode\":\"all\"}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  notifications NotificationEntry[]
+  analytics     AnalyticsEvent[]
+}
+
+model NotificationEntry {
+  id            String   @id @default(cuid())
+  merchantId    String
+  source        String
+  customerName  String
+  location      String
+  productId     String?
+  productName   String
+  productImage  String?
+  productHref   String?
+  purchaseDate  DateTime @default(now())
+  isPrioritized Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store     StoreSettings    @relation(fields: [merchantId], references: [merchantId])
+  analytics AnalyticsEvent[]
+
+  @@index([merchantId])
+  @@index([merchantId, isActive])
+}
+
+model AnalyticsEvent {
+  id                  String   @id @default(cuid())
+  merchantId          String
+  notificationEntryId String?
+  eventType           String
+  page                String
+  device              String
+  timestamp           DateTime @default(now())
+
+  store        StoreSettings     @relation(fields: [merchantId], references: [merchantId])
+  notification NotificationEntry? @relation(fields: [notificationEntryId], references: [id])
+
+  @@index([merchantId, timestamp])
+  @@index([merchantId, eventType, timestamp])
+}
