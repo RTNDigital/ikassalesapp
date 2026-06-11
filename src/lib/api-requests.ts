@@ -23,6 +23,16 @@ export async function makeGetRequest<T>({ url, data, token }: { url: string; dat
   });
 }
 
+export async function makeDeleteRequest<T>({ url, token }: { url: string; token?: string }) {
+  return axios.delete<ApiResponseType<T>>(url, {
+    headers: token
+      ? {
+          Authorization: `JWT ${token}`,
+        }
+      : undefined,
+  });
+}
+
 // API requests object - frontend-backend bridge
 export const ApiRequests = {
   ikas: {
@@ -31,5 +41,15 @@ export const ApiRequests = {
   settings: {
     get: (token: string) => makeGetRequest<{ settings: any }>({ url: '/api/ikas/settings', token }),
     update: (token: string, data: any) => makePostRequest<{ settings: any }>({ url: '/api/ikas/settings', data, token }),
+  },
+  notifications: {
+    list: (token: string, source?: string) =>
+      makeGetRequest<{ notifications: any[] }>({ url: '/api/ikas/notifications', token, data: source ? { source } : undefined }),
+    create: (token: string, data: any) =>
+      makePostRequest<{ notification: any }>({ url: '/api/ikas/notifications', data, token }),
+    update: (token: string, id: string, data: any) =>
+      makePostRequest<{ notification: any }>({ url: `/api/ikas/notifications/${id}`, data, token }),
+    remove: (token: string, id: string) =>
+      makeDeleteRequest<void>({ url: `/api/ikas/notifications/${id}`, token }),
   },
 };
