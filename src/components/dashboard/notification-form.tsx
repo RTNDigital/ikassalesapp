@@ -14,6 +14,7 @@ interface SelectedProduct {
   id: string;
   name: string;
   image: string | null;
+  href: string | null;
 }
 
 interface NotificationFormProps {
@@ -41,6 +42,7 @@ export function NotificationForm({ token, onCreated }: NotificationFormProps) {
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         productImage: selectedProduct.image,
+        productHref: selectedProduct.href,
         isPrioritized,
       });
 

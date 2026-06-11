@@ -37,6 +37,9 @@ export type ListProductQueryData = {
   data: Array<{
   id: string;
   name: string;
+  metaData?: {
+  slug: string;
+};
   variants: Array<{
   images?: Array<{
   fileName?: string;
@@ -91,6 +94,9 @@ export class GeneratedQueries {
       data {
         id
         name
+        metaData {
+          slug
+        }
         variants {
           images {
             fileName

@@ -9,11 +9,12 @@ interface ProductResult {
   id: string;
   name: string;
   image: string | null;
+  href: string | null;
 }
 
 interface ProductSelectorProps {
   token: string;
-  onSelect: (product: { id: string; name: string; image: string | null }) => void;
+  onSelect: (product: { id: string; name: string; image: string | null; href: string | null }) => void;
   selectedName?: string;
 }
 
@@ -62,7 +63,7 @@ export function ProductSelector({ token, onSelect, selectedName }: ProductSelect
   const handleSelect = (product: ProductResult) => {
     setQuery(product.name);
     setOpen(false);
-    onSelect({ id: product.id, name: product.name, image: product.image });
+    onSelect({ id: product.id, name: product.name, image: product.image, href: product.href });
   };
 
   const handleFocus = () => {

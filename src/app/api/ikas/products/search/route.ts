@@ -7,6 +7,7 @@ export type ProductSearchItem = {
   id: string;
   name: string;
   image: string | null;
+  href: string | null;
 };
 
 export type ProductSearchApiResponse = {
@@ -57,10 +58,13 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        const slug = (product as any).metaData?.slug || null;
+
         return {
           id: product.id,
           name: product.name,
           image,
+          href: slug ? `/${slug}` : null,
         };
       });
 

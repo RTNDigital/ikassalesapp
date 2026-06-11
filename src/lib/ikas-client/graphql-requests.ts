@@ -25,6 +25,9 @@ export const LIST_PRODUCT = gql`
       data {
         id
         name
+        metaData {
+          slug
+        }
         variants {
           images {
             fileName
