@@ -166,8 +166,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     data: {
       summary: {
-        totalImpressions,
-        totalClicks,
+        impressions: totalImpressions,
+        clicks: totalClicks,
         ctr: Math.round(ctr * 100) / 100,
       },
       daily,

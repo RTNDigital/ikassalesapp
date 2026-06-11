@@ -30,10 +30,10 @@ interface DailyEntry {
 }
 
 interface TopProduct {
-  name: string;
+  productName: string;
   clicks: number;
-  impressions: number;
-  ctr: number;
+  impressions?: number;
+  ctr?: number;
 }
 
 interface DeviceBreakdown {
@@ -97,10 +97,13 @@ export function AnalyticsTab({ token }: { token: string }) {
     );
   }
 
-  const { summary, daily, topProducts, devices } = analyticsData;
-  const totalDevices = devices.desktop + devices.mobile;
-  const desktopPct = totalDevices > 0 ? Math.round((devices.desktop / totalDevices) * 100) : 0;
-  const mobilePct = totalDevices > 0 ? Math.round((devices.mobile / totalDevices) * 100) : 0;
+  const summary = analyticsData.summary ?? { impressions: 0, clicks: 0, ctr: 0 };
+  const daily = analyticsData.daily ?? [];
+  const topProducts = analyticsData.topProducts ?? [];
+  const devices = analyticsData.devices ?? { desktop: 0, mobile: 0 };
+  const totalDevices = (devices.desktop || 0) + (devices.mobile || 0);
+  const desktopPct = totalDevices > 0 ? Math.round(((devices.desktop || 0) / totalDevices) * 100) : 0;
+  const mobilePct = totalDevices > 0 ? Math.round(((devices.mobile || 0) / totalDevices) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -127,7 +130,7 @@ export function AnalyticsTab({ token }: { token: string }) {
             <Eye className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{summary.impressions.toLocaleString('tr-TR')}</p>
+            <p className="text-2xl font-bold">{(summary.impressions ?? 0).toLocaleString('tr-TR')}</p>
           </CardContent>
         </Card>
 
@@ -137,7 +140,7 @@ export function AnalyticsTab({ token }: { token: string }) {
             <MousePointerClick className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{summary.clicks.toLocaleString('tr-TR')}</p>
+            <p className="text-2xl font-bold">{(summary.clicks ?? 0).toLocaleString('tr-TR')}</p>
           </CardContent>
         </Card>
 
@@ -228,10 +231,10 @@ export function AnalyticsTab({ token }: { token: string }) {
                 <tbody>
                   {topProducts.map((product, index) => (
                     <tr key={index} className="border-b last:border-0">
-                      <td className="py-2">{product.name}</td>
-                      <td className="py-2 text-right">{product.clicks.toLocaleString('tr-TR')}</td>
-                      <td className="py-2 text-right">{product.impressions.toLocaleString('tr-TR')}</td>
-                      <td className="py-2 text-right">%{product.ctr.toFixed(2)}</td>
+                      <td className="py-2">{product.productName}</td>
+                      <td className="py-2 text-right">{(product.clicks ?? 0).toLocaleString('tr-TR')}</td>
+                      <td className="py-2 text-right">{(product.impressions ?? 0).toLocaleString('tr-TR')}</td>
+                      <td className="py-2 text-right">%{(product.ctr ?? 0).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
