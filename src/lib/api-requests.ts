@@ -52,4 +52,8 @@ export const ApiRequests = {
     remove: (token: string, id: string) =>
       makeDeleteRequest<void>({ url: `/api/ikas/notifications/${id}`, token }),
   },
+  analytics: {
+    get: (token: string, days?: number) =>
+      makeGetRequest<any>({ url: '/api/analytics', token, data: { days: days || 7 } }),
+  },
 };
