@@ -46,14 +46,13 @@ export async function GET(request: NextRequest) {
 
     if (response.isSuccess && response.data?.listProduct) {
       const products: ProductSearchItem[] = response.data.listProduct.data.map((product) => {
-        // Find the first main image across all variants, falling back to the first image
         let image: string | null = null;
         for (const variant of product.variants) {
           if (!variant.images?.length) continue;
           const mainImage = variant.images.find((img) => img.isMain);
           const selectedImage = mainImage || variant.images[0];
-          if (selectedImage?.fileName) {
-            image = selectedImage.fileName;
+          if (selectedImage?.fileName && selectedImage?.imageId) {
+            image = `https://cdn.myikas.com/images/${user.merchantId}/${selectedImage.imageId}/180/${selectedImage.fileName}.webp`;
             break;
           }
         }
