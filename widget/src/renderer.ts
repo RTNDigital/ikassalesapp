@@ -145,11 +145,16 @@ export function renderToast(
   });
   toast.appendChild(close);
 
-  // Click handler — navigate to product
+  // Click handler — navigate to product (validate URL protocol to prevent XSS)
   toast.addEventListener('click', () => {
     trackEvent(merchantId, 'click', notification.id);
     if (notification.productHref) {
-      window.open(notification.productHref, '_self');
+      try {
+        const url = new URL(notification.productHref, window.location.href);
+        if (url.protocol === 'https:' || url.protocol === 'http:') {
+          window.open(url.toString(), '_self');
+        }
+      } catch {}
     }
   });
 
