@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GetMerchantApiResponse } from '../app/api/ikas/get-merchant/route';
+import { SyncOrdersApiResponse } from '../app/api/ikas/sync-orders/route';
 import { ApiResponseType } from '../globals/constants';
 
 export async function makePostRequest<T>({ url, data, token }: { url: string; data?: any; token?: string }) {
@@ -51,6 +52,10 @@ export const ApiRequests = {
       makePostRequest<{ notification: any }>({ url: `/api/ikas/notifications/${id}`, data, token }),
     remove: (token: string, id: string) =>
       makeDeleteRequest<void>({ url: `/api/ikas/notifications/${id}`, token }),
+  },
+  orders: {
+    sync: (token: string) =>
+      makePostRequest<SyncOrdersApiResponse>({ url: '/api/ikas/sync-orders', token }),
   },
   analytics: {
     get: (token: string, days?: number) =>
