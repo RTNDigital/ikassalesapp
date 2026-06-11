@@ -2,8 +2,6 @@ import { WidgetNotification, WidgetSettings } from './api';
 import { fillTemplate, timeAgo } from './utils';
 import { trackEvent } from './analytics';
 
-// --- Safe DOM helpers ---
-
 function el(tag: string, className?: string, text?: string): HTMLElement {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -15,16 +13,14 @@ function closeBtn(): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.className = 'sn-close';
   btn.setAttribute('aria-label', 'Close');
-  btn.textContent = '×'; // multiplication sign (x)
+  btn.textContent = '×';
   return btn;
 }
 
 function safeImg(src: string, className: string): HTMLImageElement | null {
   try {
     const url = new URL(src);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-      return null;
-    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
   } catch {
     return null;
   }
@@ -36,67 +32,90 @@ function safeImg(src: string, className: string): HTMLImageElement | null {
   return img;
 }
 
-// --- Theme builders ---
+function buildClassic(
+  notification: WidgetNotification,
+  title: string,
+  meta: string,
+  hasProductLink: boolean,
+): HTMLElement {
+  const wrapper = el('div', 'sn-inner');
 
-function buildClassic(title: string, productName: string, meta: string, imageUrl: string | null): HTMLElement {
-  const wrapper = el('div', 'sn-classic');
-
-  if (imageUrl) {
-    const img = safeImg(imageUrl, 'sn-classic-img');
-    if (img) wrapper.appendChild(img);
+  if (notification.productImage) {
+    const imgWrap = el('div', 'sn-img-wrap');
+    const img = safeImg(notification.productImage, 'sn-img');
+    if (img) imgWrap.appendChild(img);
+    wrapper.appendChild(imgWrap);
   }
 
-  const content = el('div', 'sn-classic-content');
-  content.appendChild(el('div', 'sn-classic-title', title));
-  content.appendChild(el('div', 'sn-classic-product', productName));
-  content.appendChild(el('div', 'sn-classic-meta', meta));
+  const content = el('div', 'sn-content');
+  content.appendChild(el('div', 'sn-title', title));
+
+  const bottom = el('div', 'sn-bottom');
+  bottom.appendChild(el('span', 'sn-meta', meta));
+  if (hasProductLink) {
+    bottom.appendChild(el('span', 'sn-cta', 'Ürünü Gör'));
+  }
+  content.appendChild(bottom);
+
+  wrapper.appendChild(content);
+  return wrapper;
+}
+
+function buildModern(
+  notification: WidgetNotification,
+  title: string,
+  meta: string,
+  hasProductLink: boolean,
+): HTMLElement {
+  const wrapper = el('div', 'sn-inner sn-modern');
+
+  if (notification.productImage) {
+    const imgWrap = el('div', 'sn-img-wrap');
+    const img = safeImg(notification.productImage, 'sn-img');
+    if (img) imgWrap.appendChild(img);
+    wrapper.appendChild(imgWrap);
+  }
+
+  const content = el('div', 'sn-content');
+
+  const titleEl = el('div', 'sn-title');
+  const nameBold = el('strong', undefined, notification.customerName);
+  titleEl.appendChild(nameBold);
+  titleEl.appendChild(document.createTextNode(` ${notification.productName} `));
+  const purchasedBold = el('strong', undefined, 'satın aldı');
+  titleEl.appendChild(purchasedBold);
+  content.appendChild(titleEl);
+
+  const bottom = el('div', 'sn-bottom');
+  bottom.appendChild(el('span', 'sn-meta', meta));
+  if (hasProductLink) {
+    bottom.appendChild(el('span', 'sn-cta', 'Ürünü Gör'));
+  }
+  content.appendChild(bottom);
+
+  wrapper.appendChild(content);
+  return wrapper;
+}
+
+function buildMinimal(
+  notification: WidgetNotification,
+  meta: string,
+): HTMLElement {
+  const wrapper = el('div', 'sn-inner sn-minimal-inner');
+
+  const dot = el('span', 'sn-dot');
+  wrapper.appendChild(dot);
+
+  const content = el('div', 'sn-content');
+  const textEl = el('div', 'sn-title');
+  textEl.appendChild(el('strong', undefined, notification.customerName));
+  textEl.appendChild(document.createTextNode(` ${notification.productName} satın aldı`));
+  content.appendChild(textEl);
+  content.appendChild(el('div', 'sn-meta', meta));
   wrapper.appendChild(content);
 
   return wrapper;
 }
-
-function buildModern(title: string, productName: string, meta: string, imageUrl: string | null): HTMLElement {
-  const wrapper = el('div', 'sn-modern');
-
-  wrapper.appendChild(el('div', 'sn-modern-header', title));
-
-  if (imageUrl) {
-    const img = safeImg(imageUrl, 'sn-modern-img');
-    if (img) wrapper.appendChild(img);
-  }
-
-  const footer = el('div', 'sn-modern-footer');
-  footer.appendChild(el('div', 'sn-modern-product', productName));
-  footer.appendChild(el('div', 'sn-modern-meta', meta));
-  wrapper.appendChild(footer);
-
-  return wrapper;
-}
-
-function buildMinimal(customerName: string, productName: string, location: string): HTMLElement {
-  const wrapper = el('div', 'sn-minimal');
-
-  wrapper.appendChild(el('span', 'sn-minimal-dot'));
-
-  const textEl = el('span', 'sn-minimal-text');
-  const nameStrong = el('strong', undefined, customerName);
-  textEl.appendChild(nameStrong);
-  textEl.appendChild(document.createTextNode(' '));
-
-  const productStrong = el('strong', undefined, productName);
-  textEl.appendChild(document.createTextNode(' satın aldı · '));
-  textEl.appendChild(productStrong);
-
-  if (location) {
-    textEl.appendChild(document.createTextNode(` · ${location}`));
-  }
-
-  wrapper.appendChild(textEl);
-
-  return wrapper;
-}
-
-// --- Main render / remove ---
 
 export interface ToastHandle {
   element: HTMLElement;
@@ -120,23 +139,21 @@ export function renderToast(
 
   const title = fillTemplate(settings.messageTemplate, vars);
   const meta = fillTemplate(settings.timeTemplate, vars);
+  const hasProductLink = !!notification.productHref;
 
-  // Create toast container
   const toast = el('div', `sn-toast ${settings.position} sn-enter`);
 
-  // Build inner content based on theme
   let inner: HTMLElement;
   if (settings.theme === 'modern') {
-    inner = buildModern(title, notification.productName, meta, notification.productImage);
+    inner = buildModern(notification, title, meta, hasProductLink);
   } else if (settings.theme === 'minimal') {
-    inner = buildMinimal(notification.customerName, notification.productName, notification.location);
+    inner = buildMinimal(notification, meta);
   } else {
-    inner = buildClassic(title, notification.productName, meta, notification.productImage);
+    inner = buildClassic(notification, title, meta, hasProductLink);
   }
 
   toast.appendChild(inner);
 
-  // Close button
   const close = closeBtn();
   close.addEventListener('click', (e: Event) => {
     e.stopPropagation();
@@ -145,7 +162,6 @@ export function renderToast(
   });
   toast.appendChild(close);
 
-  // Click handler — navigate to product (validate URL protocol to prevent XSS)
   toast.addEventListener('click', () => {
     trackEvent(merchantId, 'click', notification.id);
     if (notification.productHref) {
@@ -161,7 +177,6 @@ export function renderToast(
   root.appendChild(toast);
   handle.element = toast;
 
-  // Animate in with double-rAF trick for reliable transition
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       toast.classList.remove('sn-enter');
@@ -176,18 +191,14 @@ export function removeToast(toast: HTMLElement): Promise<void> {
   return new Promise((resolve) => {
     toast.classList.remove('sn-enter-active');
     toast.classList.add('sn-exit');
-
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         toast.classList.remove('sn-exit');
         toast.classList.add('sn-exit-active');
       });
     });
-
     setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
       resolve();
     }, 500);
   });
