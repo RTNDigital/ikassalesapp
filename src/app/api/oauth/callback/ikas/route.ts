@@ -8,6 +8,7 @@ import { JwtHelpers } from '@/helpers/jwt-helpers';
 import { TokenHelpers } from '@/helpers/token-helpers';
 import { AuthToken } from '@/models/auth-token';
 import { AuthTokenManager } from '@/models/auth-token/manager';
+import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import z from 'zod';
 
@@ -122,6 +123,45 @@ export async function GET(request: NextRequest) {
 
     // Store the token for future use
     await AuthTokenManager.put(token);
+
+    // Create default store settings if not exists
+    await prisma.storeSettings.upsert({
+      where: { merchantId },
+      create: { merchantId },
+      update: {},
+    });
+
+    // Inject widget script into storefront (fire-and-forget)
+    const deployUrl = process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://app-name-sales-notifications.vercel.app';
+    const scriptContent = `<script src="${deployUrl}/widget.js?mid=${merchantId}" defer></script>`;
+    try {
+      const salesChannelId = authorizedAppResponse.data.getAuthorizedApp.salesChannelId;
+      if (salesChannelId) {
+        await fetch(config.graphApiUrl!, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token.accessToken}`,
+          },
+          body: JSON.stringify({
+            query: `mutation CreateStorefrontJSScript($input: CreateStorefrontJSScriptInput!) {
+              createStorefrontJSScript(input: $input) { id name }
+            }`,
+            variables: {
+              input: {
+                name: 'Sales Notifications Widget',
+                contentType: 'SCRIPT',
+                scriptContent,
+                storefrontId: salesChannelId,
+                isHighPriority: false,
+              },
+            },
+          }),
+        });
+      }
+    } catch (e) {
+      console.error('Widget script injection failed (non-blocking):', e);
+    }
 
     // Update session with new merchant and app IDs, clear state, and set expiration
     session.expiresAt = new Date(Date.now() + 3600 * 1000);
