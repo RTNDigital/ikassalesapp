@@ -84,6 +84,25 @@ export function getThemeCSS(theme: string, colors: ThemeColors): string {
       min-width: 0;
     }
 
+    .sn-name {
+      font-size: 13px;
+      color: ${text};
+      margin-bottom: 2px;
+      line-height: 1.3;
+    }
+    .sn-name strong { font-weight: 700; }
+
+    .sn-product {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 6px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
     .sn-title {
       font-size: 13px;
       color: ${text};

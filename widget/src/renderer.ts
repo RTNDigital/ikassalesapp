@@ -34,7 +34,7 @@ function safeImg(src: string, className: string): HTMLImageElement | null {
 
 function buildClassic(
   notification: WidgetNotification,
-  title: string,
+  _title: string,
   meta: string,
   hasProductLink: boolean,
 ): HTMLElement {
@@ -48,7 +48,13 @@ function buildClassic(
   }
 
   const content = el('div', 'sn-content');
-  content.appendChild(el('div', 'sn-title', title));
+
+  const nameRow = el('div', 'sn-name');
+  nameRow.appendChild(el('strong', undefined, notification.customerName));
+  nameRow.appendChild(document.createTextNode(' satın aldı'));
+  content.appendChild(nameRow);
+
+  content.appendChild(el('div', 'sn-product', notification.productName));
 
   const bottom = el('div', 'sn-bottom');
   bottom.appendChild(el('span', 'sn-meta', meta));
@@ -63,7 +69,7 @@ function buildClassic(
 
 function buildModern(
   notification: WidgetNotification,
-  title: string,
+  _title: string,
   meta: string,
   hasProductLink: boolean,
 ): HTMLElement {
@@ -78,13 +84,12 @@ function buildModern(
 
   const content = el('div', 'sn-content');
 
-  const titleEl = el('div', 'sn-title');
-  const nameBold = el('strong', undefined, notification.customerName);
-  titleEl.appendChild(nameBold);
-  titleEl.appendChild(document.createTextNode(` ${notification.productName} `));
-  const purchasedBold = el('strong', undefined, 'satın aldı');
-  titleEl.appendChild(purchasedBold);
-  content.appendChild(titleEl);
+  const nameRow = el('div', 'sn-name');
+  nameRow.appendChild(el('strong', undefined, notification.customerName));
+  nameRow.appendChild(document.createTextNode(' satın aldı'));
+  content.appendChild(nameRow);
+
+  content.appendChild(el('div', 'sn-product', notification.productName));
 
   const bottom = el('div', 'sn-bottom');
   bottom.appendChild(el('span', 'sn-meta', meta));
