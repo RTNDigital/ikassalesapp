@@ -86,8 +86,8 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${authToken.accessToken}`,
       },
       body: JSON.stringify({
-        query: `query ListOrder($pagination: PaginationInput) {
-          listOrder(pagination: $pagination) {
+        query: `query ListOrder($pagination: PaginationInput, $sort: String, $status: OrderStatusEnumInputFilter) {
+          listOrder(pagination: $pagination, sort: $sort, status: $status) {
             data {
               id
               status
@@ -102,6 +102,8 @@ export async function POST(request: Request) {
         }`,
         variables: {
           pagination: { limit: 100, page: 1 },
+          sort: '-createdAt',
+          status: { eq: 'CREATED' },
         },
       }),
     });
