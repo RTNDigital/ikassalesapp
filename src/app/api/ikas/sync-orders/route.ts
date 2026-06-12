@@ -16,7 +16,7 @@ interface OrderLineItem {
 
 interface OrderAddress {
   firstName?: string;
-  city?: string;
+  city?: { name?: string };
 }
 
 interface Order {
@@ -87,8 +87,8 @@ export async function POST(request: Request) {
           listOrder(pagination: $pagination) {
             data {
               id
-              shippingAddress { firstName city }
-              billingAddress { firstName city }
+              shippingAddress { firstName city { name } }
+              billingAddress { firstName city { name } }
               orderLineItems {
                 variant { name productId mainImageId slug }
               }
@@ -144,8 +144,8 @@ export async function POST(request: Request) {
       'Müşteri';
 
     const location =
-      order.shippingAddress?.city ??
-      order.billingAddress?.city ??
+      order.shippingAddress?.city?.name ??
+      order.billingAddress?.city?.name ??
       '';
 
     const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
