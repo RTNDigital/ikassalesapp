@@ -144,23 +144,27 @@ export async function POST(request: Request) {
     }
   }
 
-  // 6. Fetch real product slugs from ikas (active products only)
+  // 6. Fetch real product slugs for only the products in these orders
   const slugMap = new Map<string, { slug: string; imageId: string | null }>();
-  if (productIds.size > 0) {
+  const idArray = [...productIds];
+  // Batch in groups of 20 to avoid query size limits
+  for (let i = 0; i < idArray.length; i += 20) {
+    const batch = idArray.slice(i, i + 20);
     try {
-      const prodRes = await fetch(graphApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken.accessToken}` },
-        body: JSON.stringify({
-          query: `query ListProduct($pagination: PaginationInput) {
-            listProduct(pagination: $pagination) {
-              data { id metaData { slug } variants { images { imageId isMain } } }
-            }
-          }`,
-          variables: { pagination: { limit: 200, page: 1 } },
-        }),
-      });
-      if (prodRes.ok) {
+      for (const pid of batch) {
+        const prodRes = await fetch(graphApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken.accessToken}` },
+          body: JSON.stringify({
+            query: `query ListProduct($id: StringFilterInput, $pagination: PaginationInput) {
+              listProduct(id: $id, pagination: $pagination) {
+                data { id metaData { slug } variants { images { imageId isMain } } }
+              }
+            }`,
+            variables: { id: { eq: pid }, pagination: { limit: 1, page: 1 } },
+          }),
+        });
+        if (!prodRes.ok) continue;
         const prodData = await prodRes.json();
         for (const p of prodData?.data?.listProduct?.data ?? []) {
           if (!p.metaData?.slug) continue;
