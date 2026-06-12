@@ -133,12 +133,54 @@ export async function POST(request: Request) {
     );
   }
 
-  // 5. Delete existing webhook entries for this merchant
+  // 5. Collect unique productIds to fetch real slugs
+  const productIds = new Set<string>();
+  for (const order of orders) {
+    if (order.status && EXCLUDED_STATUSES.includes(order.status)) continue;
+    for (const item of order.orderLineItems ?? []) {
+      if (item.variant?.productId) productIds.add(item.variant.productId);
+    }
+  }
+
+  // 6. Fetch real product slugs from ikas (active products only)
+  const slugMap = new Map<string, { slug: string; imageId: string | null }>();
+  if (productIds.size > 0) {
+    try {
+      const prodRes = await fetch(graphApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken.accessToken}` },
+        body: JSON.stringify({
+          query: `query ListProduct($pagination: PaginationInput) {
+            listProduct(pagination: $pagination) {
+              data { id metaData { slug } variants { images { imageId isMain } } }
+            }
+          }`,
+          variables: { pagination: { limit: 200, page: 1 } },
+        }),
+      });
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        for (const p of prodData?.data?.listProduct?.data ?? []) {
+          if (!p.metaData?.slug) continue;
+          let imageId: string | null = null;
+          for (const v of p.variants ?? []) {
+            const mainImg = (v.images ?? []).find((i: any) => i.isMain);
+            if (mainImg?.imageId) { imageId = mainImg.imageId; break; }
+          }
+          slugMap.set(p.id, { slug: p.metaData.slug, imageId });
+        }
+      }
+    } catch (e) {
+      console.error('[sync-orders] Failed to fetch product slugs:', e);
+    }
+  }
+
+  // 7. Delete existing webhook entries for this merchant
   await prisma.notificationEntry.deleteMany({
     where: { merchantId: user.merchantId, source: 'webhook' },
   });
 
-  // 6. Create new NotificationEntry records from fetched orders
+  // 8. Create new NotificationEntry records from fetched orders
   let synced = 0;
 
   for (const order of orders) {
@@ -157,16 +199,19 @@ export async function POST(request: Request) {
     const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const lineItems = order.orderLineItems ?? [];
 
-    // Only include items with a valid slug (active products with a storefront page)
-    const validItems = lineItems.filter((item) => item.variant?.slug && item.variant?.name);
+    const validItems = lineItems.filter((item) => {
+      if (!item.variant?.productId || !item.variant?.name) return false;
+      return slugMap.has(item.variant.productId);
+    });
 
     if (validItems.length === 0) continue;
 
     await prisma.$transaction(
       validItems.map((item) => {
         const v = item.variant!;
-        const imageUrl = v.mainImageId
-          ? `https://cdn.myikas.com/images/${user.merchantId}/${v.mainImageId}/180/${v.mainImageId}.webp`
+        const productInfo = slugMap.get(v.productId!);
+        const imageUrl = productInfo?.imageId
+          ? `https://cdn.myikas.com/images/${user.merchantId}/${productInfo.imageId}/180/${productInfo.imageId}.webp`
           : null;
         return prisma.notificationEntry.create({
           data: {
@@ -177,7 +222,7 @@ export async function POST(request: Request) {
             productId: v.productId ?? null,
             productName: v.name ?? 'Ürün',
             productImage: imageUrl,
-            productHref: `/${v.slug}`,
+            productHref: productInfo?.slug ? `/${productInfo.slug}` : null,
             purchaseDate,
             isPrioritized: false,
             isActive: true,
