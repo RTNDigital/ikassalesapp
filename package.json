@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && npx esbuild widget/src/index.ts --bundle --minify --outfile=public/widget.js --format=iife --target=es2020 && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "codegen": "graphql-codegen --config src/lib/ikas-client/codegen.ts",
