@@ -131,18 +131,21 @@ export async function GET(request: NextRequest) {
       update: {},
     });
 
-    // Inject widget script into storefront (fire-and-forget)
+    // Inject widget script into all storefronts (fire-and-forget)
     const deployUrl = process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://app-name-sales-notifications.vercel.app';
     const scriptContent = `<script src="${deployUrl}/widget.js?mid=${merchantId}" defer></script>`;
     try {
-      const salesChannelId = authorizedAppResponse.data.getAuthorizedApp.salesChannelId;
-      if (salesChannelId) {
+      const sfRes = await fetch(config.graphApiUrl!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.accessToken}` },
+        body: JSON.stringify({ query: '{ listStorefront { id } }' }),
+      });
+      const sfData = await sfRes.json();
+      const storefronts = sfData?.data?.listStorefront || [];
+      for (const sf of storefronts) {
         await fetch(config.graphApiUrl!, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token.accessToken}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.accessToken}` },
           body: JSON.stringify({
             query: `mutation CreateStorefrontJSScript($input: CreateStorefrontJSScriptInput!) {
               createStorefrontJSScript(input: $input) { id name }
@@ -152,7 +155,7 @@ export async function GET(request: NextRequest) {
                 name: 'Sales Notifications Widget',
                 contentType: 'SCRIPT',
                 scriptContent,
-                storefrontId: salesChannelId,
+                storefrontId: sf.id,
                 isHighPriority: false,
               },
             },
