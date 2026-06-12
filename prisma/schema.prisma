@@ -43,7 +43,7 @@ model StoreSettings {
   timeTemplate     String   @default("{{time}} önce · {{location}}")
   dataMode         String   @default("manual")
   autoSyncOrders   Boolean  @default(false)
-  syncOrderCount   Int      @default(50)
+  syncOrderCount   Int      @default(20)
   animation        String   @default("slide")
   theme            String   @default("classic")
   customColors     String   @default("{}")

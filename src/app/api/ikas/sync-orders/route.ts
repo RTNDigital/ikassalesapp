@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     where: { merchantId: user.merchantId },
   });
 
-  const syncOrderCount = settings?.syncOrderCount ?? 50;
+  const maxNotifications = settings?.syncOrderCount ?? 20;
 
   // 4. Fetch recent orders via raw GraphQL (avoids dependency on codegen for listOrder)
   const graphApiUrl = process.env.NEXT_PUBLIC_GRAPH_API_URL || 'https://api.myikas.com/api/v2/admin/graphql';
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
           }
         }`,
         variables: {
-          pagination: { limit: syncOrderCount, page: 1 },
+          pagination: { limit: 100, page: 1 },
         },
       }),
     });
@@ -180,10 +180,11 @@ export async function POST(request: Request) {
     where: { merchantId: user.merchantId, source: 'webhook' },
   });
 
-  // 8. Create new NotificationEntry records from fetched orders
+  // 8. Create new NotificationEntry records (cap at maxNotifications)
   let synced = 0;
 
   for (const order of orders) {
+    if (synced >= maxNotifications) break;
     if (order.status && EXCLUDED_STATUSES.includes(order.status)) continue;
 
     const customerName =
@@ -199,7 +200,9 @@ export async function POST(request: Request) {
     const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const lineItems = order.orderLineItems ?? [];
 
-    const validItems = lineItems.filter((item) => item.variant?.name);
+    const validItems = lineItems
+      .filter((item) => item.variant?.name)
+      .slice(0, maxNotifications - synced);
 
     if (validItems.length === 0) continue;
 
