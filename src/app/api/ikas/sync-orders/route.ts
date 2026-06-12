@@ -21,11 +21,14 @@ interface OrderAddress {
 
 interface Order {
   id: string;
+  status?: string;
   shippingAddress?: OrderAddress;
   billingAddress?: OrderAddress;
   orderLineItems?: OrderLineItem[];
   createdAt?: string;
 }
+
+const EXCLUDED_STATUSES = ['CANCELLED', 'PARTIALLY_CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DRAFT'];
 
 interface ListOrderResponse {
   data?: {
@@ -87,6 +90,7 @@ export async function POST(request: Request) {
           listOrder(pagination: $pagination) {
             data {
               id
+              status
               shippingAddress { firstName city { name } }
               billingAddress { firstName city { name } }
               orderLineItems {
@@ -138,6 +142,8 @@ export async function POST(request: Request) {
   let synced = 0;
 
   for (const order of orders) {
+    if (order.status && EXCLUDED_STATUSES.includes(order.status)) continue;
+
     const customerName =
       order.shippingAddress?.firstName ??
       order.billingAddress?.firstName ??
@@ -151,12 +157,15 @@ export async function POST(request: Request) {
     const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const lineItems = order.orderLineItems ?? [];
 
-    if (lineItems.length === 0) continue;
+    // Only include items with a valid slug (active products with a storefront page)
+    const validItems = lineItems.filter((item) => item.variant?.slug && item.variant?.name);
+
+    if (validItems.length === 0) continue;
 
     await prisma.$transaction(
-      lineItems.map((item) => {
-        const v = item.variant;
-        const imageUrl = v?.mainImageId
+      validItems.map((item) => {
+        const v = item.variant!;
+        const imageUrl = v.mainImageId
           ? `https://cdn.myikas.com/images/${user.merchantId}/${v.mainImageId}/180/${v.mainImageId}.webp`
           : null;
         return prisma.notificationEntry.create({
@@ -165,10 +174,10 @@ export async function POST(request: Request) {
             source: 'webhook',
             customerName,
             location,
-            productId: v?.productId ?? null,
-            productName: v?.name ?? 'Ürün',
+            productId: v.productId ?? null,
+            productName: v.name ?? 'Ürün',
             productImage: imageUrl,
-            productHref: v?.slug ? `/${v.slug}` : null,
+            productHref: `/${v.slug}`,
             purchaseDate,
             isPrioritized: false,
             isActive: true,
@@ -177,7 +186,7 @@ export async function POST(request: Request) {
       }),
     );
 
-    synced += lineItems.length;
+    synced += validItems.length;
   }
 
   // 7. Return sync results
