@@ -3,11 +3,15 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 
-interface OrderLineItem {
+interface OrderLineItemVariant {
+  name?: string;
   productId?: string;
-  productName?: string;
-  thumbnailImage?: string;
-  productHref?: string;
+  mainImageId?: string;
+  slug?: string;
+}
+
+interface OrderLineItem {
+  variant?: OrderLineItemVariant;
 }
 
 interface OrderAddress {
@@ -85,7 +89,9 @@ export async function POST(request: Request) {
               id
               shippingAddress { firstName city }
               billingAddress { firstName city }
-              orderLineItems { productId productName thumbnailImage productHref }
+              orderLineItems {
+                variant { name productId mainImageId slug }
+              }
               createdAt
             }
           }
@@ -148,23 +154,27 @@ export async function POST(request: Request) {
     if (lineItems.length === 0) continue;
 
     await prisma.$transaction(
-      lineItems.map((item) =>
-        prisma.notificationEntry.create({
+      lineItems.map((item) => {
+        const v = item.variant;
+        const imageUrl = v?.mainImageId
+          ? `https://cdn.myikas.com/images/${user.merchantId}/${v.mainImageId}/180/${v.mainImageId}.webp`
+          : null;
+        return prisma.notificationEntry.create({
           data: {
             merchantId: user.merchantId,
             source: 'webhook',
             customerName,
             location,
-            productId: item.productId ?? null,
-            productName: item.productName ?? 'Ürün',
-            productImage: item.thumbnailImage ?? null,
-            productHref: item.productHref ?? null,
+            productId: v?.productId ?? null,
+            productName: v?.name ?? 'Ürün',
+            productImage: imageUrl,
+            productHref: v?.slug ? `/${v.slug}` : null,
             purchaseDate,
             isPrioritized: false,
             isActive: true,
           },
-        }),
-      ),
+        });
+      }),
     );
 
     synced += lineItems.length;
