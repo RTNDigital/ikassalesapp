@@ -3,195 +3,138 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth-helpers';
 import { AuthTokenManager } from '@/models/auth-token/manager';
 
-interface OrderLineItemVariant {
-  name?: string;
-  productId?: string;
-  mainImageId?: string;
-  slug?: string;
-}
-
-interface OrderLineItem {
-  variant?: OrderLineItemVariant;
-}
-
-interface OrderAddress {
-  firstName?: string;
-  city?: { name?: string };
-}
-
-interface Order {
-  id: string;
-  status?: string;
-  shippingAddress?: OrderAddress;
-  billingAddress?: OrderAddress;
-  orderLineItems?: OrderLineItem[];
-  createdAt?: string;
-}
-
-const EXCLUDED_STATUSES = ['CANCELLED', 'PARTIALLY_CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DRAFT'];
-
-interface ListOrderResponse {
-  data?: {
-    listOrder?: {
-      data?: Order[];
-    };
-  };
-  errors?: Array<{ message: string }>;
-}
-
 export type SyncOrdersApiResponse = {
   synced: number;
   ordersProcessed: number;
 };
 
-/**
- * POST /api/ikas/sync-orders
- *
- * Manually syncs recent orders from ikas into NotificationEntry records.
- * Authenticated endpoint — requires JWT token.
- *
- * 1. Fetches recent orders via ikas GraphQL API
- * 2. Deletes existing webhook entries for the merchant
- * 3. Creates fresh NotificationEntry records from fetched orders
- */
-export async function POST(request: Request) {
-  // 1. Authenticate
-  const user = getUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+const EXCLUDED_STATUSES = ['CANCELLED', 'PARTIALLY_CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'DRAFT'];
 
-  // 2. Get auth token
-  const authToken = await AuthTokenManager.get(user.authorizedAppId);
-  if (!authToken) {
-    return NextResponse.json({ error: 'Auth token not found' }, { status: 404 });
-  }
-
-  // 3. Get store settings to determine syncOrderCount
-  const settings = await prisma.storeSettings.findUnique({
-    where: { merchantId: user.merchantId },
+async function gql(url: string, token: string, query: string, variables?: Record<string, unknown>) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ query, variables }),
   });
+  if (!res.ok) throw new Error(`GraphQL ${res.status}`);
+  const json = await res.json();
+  if (json.errors?.length) throw new Error(json.errors[0].message);
+  return json.data;
+}
 
+export async function POST(request: Request) {
+  const user = getUserFromRequest(request);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const authToken = await AuthTokenManager.get(user.authorizedAppId);
+  if (!authToken) return NextResponse.json({ error: 'Auth token not found' }, { status: 404 });
+
+  const settings = await prisma.storeSettings.findUnique({ where: { merchantId: user.merchantId } });
   const maxNotifications = settings?.syncOrderCount ?? 20;
 
-  // 4. Fetch recent orders via raw GraphQL (avoids dependency on codegen for listOrder)
   const graphApiUrl = process.env.NEXT_PUBLIC_GRAPH_API_URL || 'https://api.myikas.com/api/v2/admin/graphql';
+  const accessToken = authToken.accessToken;
 
-  let orders: Order[] = [];
+  // 1. Fetch recent orders — sorted newest first
+  let orders: any[] = [];
   try {
-    const response = await fetch(graphApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken.accessToken}`,
-      },
-      body: JSON.stringify({
-        query: `query ListOrder($pagination: PaginationInput, $sort: String, $status: OrderStatusEnumInputFilter) {
-          listOrder(pagination: $pagination, sort: $sort, status: $status) {
+    const data = await gql(graphApiUrl, accessToken, `
+      query ListOrder($pagination: PaginationInput, $sort: String) {
+        listOrder(pagination: $pagination, sort: $sort) {
+          data {
+            id status createdAt
+            shippingAddress { firstName city { name } }
+            billingAddress { firstName city { name } }
+            orderLineItems {
+              variant { productId }
+            }
+          }
+        }
+      }
+    `, { pagination: { limit: 100, page: 1 }, sort: '-createdAt' });
+    orders = data?.listOrder?.data ?? [];
+  } catch (error) {
+    console.error('[sync-orders] Failed to fetch orders:', error);
+    // Fallback: try without sort
+    try {
+      const data = await gql(graphApiUrl, accessToken, `
+        query ListOrder($pagination: PaginationInput) {
+          listOrder(pagination: $pagination) {
             data {
-              id
-              status
+              id status createdAt
               shippingAddress { firstName city { name } }
               billingAddress { firstName city { name } }
               orderLineItems {
-                variant { name productId mainImageId slug }
+                variant { productId }
               }
-              createdAt
             }
           }
-        }`,
-        variables: {
-          pagination: { limit: 100, page: 1 },
-          sort: '-createdAt',
-          status: { eq: 'CREATED' },
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('[sync-orders] GraphQL request failed:', response.status, response.statusText);
-      return NextResponse.json(
-        { error: 'Failed to fetch orders from ikas' },
-        { status: 502 },
-      );
+        }
+      `, { pagination: { limit: 100, page: 1 } });
+      orders = data?.listOrder?.data ?? [];
+      // Sort client-side
+      orders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e2) {
+      console.error('[sync-orders] Fallback also failed:', e2);
+      return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 502 });
     }
-
-    const result: ListOrderResponse = await response.json();
-
-    if (result.errors?.length) {
-      console.error('[sync-orders] GraphQL errors:', result.errors);
-      return NextResponse.json(
-        { error: 'GraphQL query failed', details: result.errors.map((e) => e.message) },
-        { status: 502 },
-      );
-    }
-
-    orders = result.data?.listOrder?.data ?? [];
-  } catch (error) {
-    console.error('[sync-orders] Failed to fetch orders:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch orders from ikas' },
-      { status: 502 },
-    );
   }
 
-  // 5. Collect unique productIds to fetch real slugs
+  // 2. Collect unique productIds from valid orders
   const productIds = new Set<string>();
-  for (const order of orders) {
-    if (order.status && EXCLUDED_STATUSES.includes(order.status)) continue;
+  const validOrders = orders.filter((o: any) => !o.status || !EXCLUDED_STATUSES.includes(o.status));
+
+  for (const order of validOrders) {
     for (const item of order.orderLineItems ?? []) {
       if (item.variant?.productId) productIds.add(item.variant.productId);
     }
   }
 
-  // 6. Fetch real product slugs for only the products in these orders
-  const slugMap = new Map<string, { slug: string; imageId: string | null }>();
-  const idArray = [...productIds];
-  // Batch in groups of 20 to avoid query size limits
-  for (let i = 0; i < idArray.length; i += 20) {
-    const batch = idArray.slice(i, i + 20);
+  // 3. Fetch product details (name, slug, image) — these are the REAL current product names
+  const productMap = new Map<string, { name: string; slug: string; imageId: string | null }>();
+  for (const pid of productIds) {
     try {
-      for (const pid of batch) {
-        const prodRes = await fetch(graphApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken.accessToken}` },
-          body: JSON.stringify({
-            query: `query ListProduct($id: StringFilterInput, $pagination: PaginationInput) {
-              listProduct(id: $id, pagination: $pagination) {
-                data { id metaData { slug } variants { images { imageId isMain } } }
-              }
-            }`,
-            variables: { id: { eq: pid }, pagination: { limit: 1, page: 1 } },
-          }),
-        });
-        if (!prodRes.ok) continue;
-        const prodData = await prodRes.json();
-        for (const p of prodData?.data?.listProduct?.data ?? []) {
-          if (!p.metaData?.slug) continue;
-          let imageId: string | null = null;
-          for (const v of p.variants ?? []) {
-            const mainImg = (v.images ?? []).find((i: any) => i.isMain);
-            if (mainImg?.imageId) { imageId = mainImg.imageId; break; }
+      const data = await gql(graphApiUrl, accessToken, `
+        query ListProduct($id: StringFilterInput) {
+          listProduct(id: $id, pagination: { limit: 1, page: 1 }) {
+            data {
+              id name
+              metaData { slug }
+              variants { images { imageId isMain } }
+            }
           }
-          slugMap.set(p.id, { slug: p.metaData.slug, imageId });
         }
+      `, { id: { eq: pid } });
+
+      for (const p of data?.listProduct?.data ?? []) {
+        if (!p.name) continue;
+        let imageId: string | null = null;
+        for (const v of p.variants ?? []) {
+          const mainImg = (v.images ?? []).find((i: any) => i.isMain);
+          if (mainImg?.imageId) { imageId = mainImg.imageId; break; }
+        }
+        productMap.set(p.id, {
+          name: p.name,
+          slug: p.metaData?.slug || '',
+          imageId,
+        });
       }
-    } catch (e) {
-      console.error('[sync-orders] Failed to fetch product slugs:', e);
+    } catch {
+      // Product not found = deleted/inactive, skip
     }
   }
 
-  // 7. Delete existing webhook entries for this merchant
+  // 4. Delete old webhook entries
   await prisma.notificationEntry.deleteMany({
     where: { merchantId: user.merchantId, source: 'webhook' },
   });
 
-  // 8. Create new NotificationEntry records (cap at maxNotifications)
+  // 5. Create notifications — one per unique product per order, using PRODUCT name (not variant)
   let synced = 0;
+  const seenProducts = new Set<string>();
 
-  for (const order of orders) {
+  for (const order of validOrders) {
     if (synced >= maxNotifications) break;
-    if (order.status && EXCLUDED_STATUSES.includes(order.status)) continue;
 
     const customerName =
       order.shippingAddress?.firstName ??
@@ -203,48 +146,45 @@ export async function POST(request: Request) {
       order.billingAddress?.city?.name ??
       '';
 
-    const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
-    const lineItems = order.orderLineItems ?? [];
+    for (const item of order.orderLineItems ?? []) {
+      if (synced >= maxNotifications) break;
 
-    const validItems = lineItems
-      .filter((item) => item.variant?.name)
-      .slice(0, maxNotifications - synced);
+      const pid = item.variant?.productId;
+      if (!pid) continue;
 
-    if (validItems.length === 0) continue;
+      // Skip duplicate products across orders
+      const dedupKey = `${customerName}-${pid}`;
+      if (seenProducts.has(dedupKey)) continue;
+      seenProducts.add(dedupKey);
 
-    await prisma.$transaction(
-      validItems.map((item) => {
-        const v = item.variant!;
-        const productInfo = slugMap.get(v.productId!);
-        const imageUrl = productInfo?.imageId
-          ? `https://cdn.myikas.com/images/${user.merchantId}/${productInfo.imageId}/180/${productInfo.imageId}.webp`
-          : null;
-        return prisma.notificationEntry.create({
-          data: {
-            merchantId: user.merchantId,
-            source: 'webhook',
-            customerName,
-            location,
-            productId: v.productId ?? null,
-            productName: v.name ?? 'Ürün',
-            productImage: imageUrl,
-            productHref: productInfo?.slug ? `/${productInfo.slug}` : null,
-            purchaseDate,
-            isPrioritized: false,
-            isActive: true,
-          },
-        });
-      }),
-    );
+      const product = productMap.get(pid);
+      if (!product) continue; // Product deleted/inactive
 
-    synced += validItems.length;
+      const imageUrl = product.imageId
+        ? `https://cdn.myikas.com/images/${user.merchantId}/${product.imageId}/180/${product.imageId}.webp`
+        : null;
+
+      await prisma.notificationEntry.create({
+        data: {
+          merchantId: user.merchantId,
+          source: 'webhook',
+          customerName,
+          location,
+          productId: pid,
+          productName: product.name,
+          productImage: imageUrl,
+          productHref: product.slug ? `/${product.slug}` : null,
+          purchaseDate: order.createdAt ? new Date(order.createdAt) : new Date(),
+          isPrioritized: false,
+          isActive: true,
+        },
+      });
+
+      synced++;
+    }
   }
 
-  // 7. Return sync results
   return NextResponse.json({
-    data: {
-      synced,
-      ordersProcessed: orders.length,
-    },
+    data: { synced, ordersProcessed: validOrders.length },
   });
 }
