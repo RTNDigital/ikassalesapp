@@ -199,10 +199,7 @@ export async function POST(request: Request) {
     const purchaseDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const lineItems = order.orderLineItems ?? [];
 
-    const validItems = lineItems.filter((item) => {
-      if (!item.variant?.productId || !item.variant?.name) return false;
-      return slugMap.has(item.variant.productId);
-    });
+    const validItems = lineItems.filter((item) => item.variant?.name);
 
     if (validItems.length === 0) continue;
 
