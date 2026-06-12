@@ -39,7 +39,7 @@ model StoreSettings {
   delayBetween     Int      @default(8000)
   firstDelay       Int      @default(3000)
   maxPerPage       Int      @default(10)
-  messageTemplate  String   @default("{{name}} satın aldı")
+  messageTemplate  String   @default("{{name}} {{product}} satın aldı")
   timeTemplate     String   @default("{{time}} önce · {{location}}")
   dataMode         String   @default("manual")
   autoSyncOrders   Boolean  @default(false)
