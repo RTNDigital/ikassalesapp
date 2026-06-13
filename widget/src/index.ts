@@ -25,29 +25,32 @@ import { renderTeaser } from './teaser';
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Helper: check page targeting
+  function matchesRule(rule: { url: string; matchType: string }): boolean {
+    const value = rule.url;
+    if (!value) return false;
+    const path = window.location.pathname;
+    const fullUrl = window.location.href;
+    switch (rule.matchType) {
+      case 'exact':
+        return fullUrl === value || path === value;
+      case 'startsWith':
+        return fullUrl.startsWith(value) || path.startsWith(value);
+      case 'contains':
+        return fullUrl.includes(value) || path.includes(value);
+      default:
+        return false;
+    }
+  }
+
   function isPageAllowed(settings: WidgetSettings): boolean {
     const targeting = settings.pageTargeting;
     if (targeting.mode === 'all') return true;
     if (!targeting.rules || targeting.rules.length === 0) return true;
 
-    const path = window.location.pathname;
-    const fullUrl = window.location.href;
-
-    return targeting.rules.some((rule) => {
-      const value = rule.url;
-      if (!value) return false;
-      switch (rule.matchType) {
-        case 'exact':
-          return fullUrl === value || path === value;
-        case 'startsWith':
-          return fullUrl.startsWith(value) || path.startsWith(value);
-        case 'contains':
-          return fullUrl.includes(value) || path.includes(value);
-        default:
-          return false;
-      }
-    });
+    if (targeting.mode === 'excluded') {
+      return !targeting.rules.some(matchesRule);
+    }
+    return targeting.rules.some(matchesRule);
   }
 
   // Helper: order notifications (prioritized first, then shuffled rest)

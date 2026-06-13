@@ -135,7 +135,7 @@ export function SettingsTab({ token }: { token: string }) {
       pageTargeting: {
         ...prev.pageTargeting,
         mode,
-        rules: mode === 'selected' ? prev.pageTargeting.rules || [] : undefined,
+        rules: mode !== 'all' ? prev.pageTargeting.rules || [] : undefined,
       },
     }));
   };
@@ -480,11 +480,12 @@ export function SettingsTab({ token }: { token: string }) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tüm Sayfalar</SelectItem>
-                <SelectItem value="selected">Seçili Sayfalar</SelectItem>
+                <SelectItem value="selected">Sadece Seçili Sayfalar</SelectItem>
+                <SelectItem value="excluded">Seçili Sayfaları Hariç Tut</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {settings.pageTargeting.mode === 'selected' && (
+          {(settings.pageTargeting.mode === 'selected' || settings.pageTargeting.mode === 'excluded') && (
             <>
               <Separator />
               <div className="space-y-3">
