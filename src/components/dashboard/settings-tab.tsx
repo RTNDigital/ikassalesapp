@@ -488,6 +488,11 @@ export function SettingsTab({ token }: { token: string }) {
           {(settings.pageTargeting.mode === 'selected' || settings.pageTargeting.mode === 'excluded') && (
             <>
               <Separator />
+              <p className="text-sm text-muted-foreground">
+                {settings.pageTargeting.mode === 'excluded'
+                  ? 'URL\'sinde aşağıdaki ifadeleri içeren sayfalarda bildirimler gösterilmez. Örn: sepet, ödeme, hesabım gibi sayfaları hariç tutabilirsiniz.'
+                  : 'Bildirimler yalnızca aşağıdaki kurallara uyan sayfalarda gösterilir.'}
+              </p>
               <div className="space-y-3">
                 {(settings.pageTargeting.rules || []).map((rule, index) => (
                   <div key={index} className="flex items-center gap-2">
