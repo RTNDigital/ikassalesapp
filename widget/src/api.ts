@@ -20,7 +20,7 @@ export interface WidgetSettings {
   teaserText: string;
   teaserBehavior: 'after-close' | 'always' | 'never';
   pageTargeting: {
-    mode: 'all' | 'selected';
+    mode: 'all' | 'selected' | 'excluded';
     rules?: { url: string; matchType: 'contains' | 'exact' | 'startsWith' }[];
   };
 }

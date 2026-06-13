@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 interface PageTargeting {
-  mode: 'all' | 'selected';
+  mode: 'all' | 'selected' | 'excluded';
   rules?: { url: string; matchType: 'contains' | 'exact' | 'startsWith' }[];
 }
 
@@ -129,7 +129,7 @@ export function SettingsTab({ token }: { token: string }) {
     }));
   };
 
-  const updatePageTargetingMode = (mode: 'all' | 'selected') => {
+  const updatePageTargetingMode = (mode: 'all' | 'selected' | 'excluded') => {
     setSettings((prev) => ({
       ...prev,
       pageTargeting: {
