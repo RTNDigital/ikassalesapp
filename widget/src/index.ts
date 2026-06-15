@@ -168,10 +168,50 @@ import { renderTeaser } from './teaser';
     runCycle();
   }
 
+  // Track URL changes for SPA navigation — hide/show widget based on page targeting
+  let lastUrl = '';
+  let widgetHost: HTMLElement | null = null;
+
+  function checkUrlChange() {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+      lastUrl = currentUrl;
+      if (widgetHost) {
+        // Re-fetch settings from cache and check page targeting
+        fetchWidgetData(baseUrl, merchantId!).then(data => {
+          if (data && widgetHost) {
+            widgetHost.style.display = isPageAllowed(data.settings) ? '' : 'none';
+          }
+        });
+      }
+    }
+  }
+
+  // Patch pushState/replaceState to detect SPA navigation
+  const origPushState = history.pushState;
+  const origReplaceState = history.replaceState;
+  history.pushState = function(...args) {
+    origPushState.apply(this, args);
+    setTimeout(checkUrlChange, 50);
+  };
+  history.replaceState = function(...args) {
+    origReplaceState.apply(this, args);
+    setTimeout(checkUrlChange, 50);
+  };
+  window.addEventListener('popstate', () => setTimeout(checkUrlChange, 50));
+
+  // Wrap init to capture widgetHost reference
+  const origInit = init;
+  async function wrappedInit() {
+    await origInit();
+    widgetHost = document.getElementById('sn-widget-host');
+    lastUrl = window.location.href;
+  }
+
   // Start when DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', wrappedInit);
   } else {
-    init();
+    wrappedInit();
   }
 })();
