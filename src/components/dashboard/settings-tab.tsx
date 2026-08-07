@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 interface PageTargeting {
   mode: 'all' | 'selected' | 'excluded';
@@ -66,6 +66,8 @@ export function SettingsTab({ token }: { token: string }) {
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reinjecting, setReinjecting] = useState(false);
+  const [reinjectResult, setReinjectResult] = useState<'success' | 'error' | null>(null);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -115,6 +117,20 @@ export function SettingsTab({ token }: { token: string }) {
       console.error('Error saving settings:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleReinjectWidget = async () => {
+    setReinjecting(true);
+    setReinjectResult(null);
+    try {
+      const res = await ApiRequests.widget.reinject(token);
+      setReinjectResult(res.data?.data?.success ? 'success' : 'error');
+    } catch {
+      setReinjectResult('error');
+    } finally {
+      setReinjecting(false);
+      setTimeout(() => setReinjectResult(null), 5000);
     }
   };
 
@@ -219,6 +235,29 @@ export function SettingsTab({ token }: { token: string }) {
                 <SelectItem value="both">Her İkisi</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <Label>Widget Kurulumu</Label>
+            <p className="text-xs text-muted-foreground">
+              Widget mağazanızda görünmüyorsa, yeniden yüklemeyi deneyin.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleReinjectWidget} disabled={reinjecting}>
+                {reinjecting ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                {reinjecting ? 'Yükleniyor...' : 'Widget\'ı Yeniden Yükle'}
+              </Button>
+              {reinjectResult === 'success' && (
+                <span className="flex items-center gap-1 text-sm text-green-600">
+                  <CheckCircle2 className="size-4" /> Başarıyla yüklendi
+                </span>
+              )}
+              {reinjectResult === 'error' && (
+                <span className="flex items-center gap-1 text-sm text-red-600">
+                  <AlertCircle className="size-4" /> Yükleme başarısız
+                </span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
