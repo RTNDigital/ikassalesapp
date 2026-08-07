@@ -4,7 +4,11 @@ import { AuthTokenManager } from '@/models/auth-token/manager';
 import { getIkas } from '@/helpers/api-helpers';
 import { config } from '@/globals/config';
 
-const REQUIRED_SCOPES = config.oauth.scope.split(',');
+// write_storefront is a console-level permission, not an OAuth scope —
+// ikas never includes it in the token response scope string.
+const OAUTH_SCOPES = config.oauth.scope
+  .split(',')
+  .filter((s) => s !== 'write_storefront');
 
 export async function GET(request: Request) {
   const user = getUserFromRequest(request);
@@ -14,7 +18,7 @@ export async function GET(request: Request) {
   if (!authToken) return NextResponse.json({ error: 'Auth token not found' }, { status: 404 });
 
   const currentScopes = authToken.scope?.split(',') || [];
-  const missingScopes = REQUIRED_SCOPES.filter((s) => !currentScopes.includes(s));
+  const missingScopes = OAUTH_SCOPES.filter((s) => !currentScopes.includes(s));
 
   if (missingScopes.length === 0) {
     return NextResponse.json({ data: { needsReauth: false } });
