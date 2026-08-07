@@ -62,6 +62,10 @@ export const ApiRequests = {
     sync: (token: string) =>
       makePostRequest<SyncOrdersApiResponse>({ url: '/api/ikas/sync-orders', token }),
   },
+  scope: {
+    check: (token: string) =>
+      makeGetRequest<{ needsReauth: boolean; missingScopes?: string[]; storeName?: string }>({ url: '/api/ikas/check-scope', token }),
+  },
   widget: {
     reinject: (token: string) =>
       makePostRequest<{ success: boolean; storefronts: { storefrontId: string; success: boolean; error?: string }[] }>({ url: '/api/ikas/reinject-widget', token }),
