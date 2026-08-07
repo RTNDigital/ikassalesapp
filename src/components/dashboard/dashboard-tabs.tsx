@@ -34,12 +34,8 @@ export function DashboardTabs({ token }: DashboardTabsProps) {
   }, [checkScope]);
 
   const handleReauth = () => {
-    const authorizeUrl = `/api/oauth/authorize/ikas?storeName=${encodeURIComponent(reauthStoreName!)}`;
-    if (window.top) {
-      window.top.location.href = authorizeUrl;
-    } else {
-      window.location.href = authorizeUrl;
-    }
+    const authorizeUrl = `${window.location.origin}/api/oauth/authorize/ikas?storeName=${encodeURIComponent(reauthStoreName!)}`;
+    window.open(authorizeUrl, '_blank');
   };
 
   return (
