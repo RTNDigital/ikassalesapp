@@ -45,7 +45,7 @@ interface SettingsState {
 const DEFAULT_SETTINGS: SettingsState = {
   isActive: true,
   showOnMobile: true,
-  dataMode: 'manual',
+  dataMode: 'both',
   messageTemplate: '{{name}} satın aldı',
   timeTemplate: '{{time}} önce · {{location}}',
   theme: 'classic',

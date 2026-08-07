@@ -41,7 +41,7 @@ model StoreSettings {
   maxPerPage       Int      @default(10)
   messageTemplate  String   @default("{{name}} {{product}} satın aldı")
   timeTemplate     String   @default("{{time}} önce · {{location}}")
-  dataMode         String   @default("manual")
+  dataMode         String   @default("both")
   autoSyncOrders   Boolean  @default(false)
   syncOrderCount   Int      @default(20)
   animation        String   @default("slide")

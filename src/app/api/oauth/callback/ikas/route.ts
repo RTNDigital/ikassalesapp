@@ -124,14 +124,14 @@ export async function GET(request: NextRequest) {
     // Store the token for future use
     await AuthTokenManager.put(token);
 
-    // Create default store settings if not exists
+    // Create default store settings if not exists (dataMode='both' so webhooks work immediately)
     await prisma.storeSettings.upsert({
       where: { merchantId },
-      create: { merchantId },
+      create: { merchantId, dataMode: 'both' },
       update: {},
     });
 
-    // Inject widget script into all storefronts (fire-and-forget)
+    // Inject widget script into all storefronts
     const deployUrl = process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://app-name-sales-notifications.vercel.app';
     const scriptContent = `<script src="${deployUrl}/widget.js?mid=${merchantId}" defer></script>`;
     try {
@@ -141,9 +141,15 @@ export async function GET(request: NextRequest) {
         body: JSON.stringify({ query: '{ listStorefront { id } }' }),
       });
       const sfData = await sfRes.json();
+      if (sfData.errors) {
+        console.error('[oauth/callback] listStorefront failed:', JSON.stringify(sfData.errors));
+      }
       const storefronts = sfData?.data?.listStorefront || [];
+      if (storefronts.length === 0) {
+        console.warn('[oauth/callback] No storefronts found for merchant:', merchantId);
+      }
       for (const sf of storefronts) {
-        await fetch(config.graphApiUrl!, {
+        const scriptRes = await fetch(config.graphApiUrl!, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.accessToken}` },
           body: JSON.stringify({
@@ -161,9 +167,13 @@ export async function GET(request: NextRequest) {
             },
           }),
         });
+        const scriptData = await scriptRes.json();
+        if (scriptData.errors) {
+          console.error('[oauth/callback] createStorefrontJSScript failed for storefront', sf.id, ':', JSON.stringify(scriptData.errors));
+        }
       }
     } catch (e) {
-      console.error('Widget script injection failed (non-blocking):', e);
+      console.error('[oauth/callback] Widget script injection failed:', e);
     }
 
     // Update session with new merchant and app IDs, clear state, and set expiration
