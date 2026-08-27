@@ -87,7 +87,13 @@ export async function POST(request: Request) {
       pagination: { limit: PRODUCT_PAGE_LIMIT, page },
     });
 
-    if (!productResponse.isSuccess || !productResponse.data?.listProduct) break;
+    if (!productResponse.isSuccess || !productResponse.data?.listProduct) {
+      console.error(
+        '[sync-orders] Failed to fetch products:',
+        productResponse.error ?? productResponse.errors,
+      );
+      break;
+    }
 
     const pageData = productResponse.data.listProduct.data ?? [];
     for (const p of pageData) {
