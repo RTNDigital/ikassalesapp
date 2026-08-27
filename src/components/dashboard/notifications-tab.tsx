@@ -13,6 +13,7 @@ export function NotificationsTab({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<{ synced: number; error?: string } | null>(null);
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -33,14 +34,18 @@ export function NotificationsTab({ token }: { token: string }) {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncResult(null);
     try {
       const res = await ApiRequests.orders.sync(token);
-      if (res.status === 200) {
+      if (res.status === 200 && res.data?.data) {
+        const data = res.data.data;
         setLastSyncAt(new Date().toLocaleString('tr-TR'));
+        setSyncResult({ synced: data.synced, error: data.error });
         await fetchEntries();
       }
     } catch (error) {
       console.error('Error syncing orders:', error);
+      setSyncResult({ synced: 0, error: 'Senkronizasyon sırasında bir hata oluştu.' });
     } finally {
       setSyncing(false);
     }
@@ -120,6 +125,16 @@ export function NotificationsTab({ token }: { token: string }) {
               {syncing ? 'Senkronize ediliyor...' : 'Siparişleri Senkronize Et'}
             </Button>
 
+            {syncResult && !syncResult.error && syncResult.synced > 0 && (
+              <p className="text-sm text-green-600">
+                {syncResult.synced} bildirim başarıyla senkronize edildi.
+              </p>
+            )}
+
+            {syncResult?.error && (
+              <p className="text-sm text-red-600">{syncResult.error}</p>
+            )}
+
             {lastSyncAt && (
               <p className="text-xs text-muted-foreground">
                 Son senkronizasyon: {lastSyncAt}
@@ -127,7 +142,7 @@ export function NotificationsTab({ token }: { token: string }) {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Bu işlem mevcut sipariş verilerini siler ve ikas&apos;tan güncel siparişleri çeker.
+              Bu işlem mevcut sipariş verilerini günceller ve ikas&apos;tan güncel siparişleri çeker.
             </p>
           </CardContent>
         </Card>

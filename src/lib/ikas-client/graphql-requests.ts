@@ -40,3 +40,32 @@ export const LIST_PRODUCT = gql`
     }
   }
 `;
+
+export const LIST_ORDER = gql`
+  query listOrder($pagination: PaginationInput, $sort: String) {
+    listOrder(pagination: $pagination, sort: $sort) {
+      data {
+        id
+        status
+        createdAt
+        shippingAddress {
+          firstName
+          city {
+            name
+          }
+        }
+        billingAddress {
+          firstName
+          city {
+            name
+          }
+        }
+        orderLineItems {
+          variant {
+            productId
+          }
+        }
+      }
+    }
+  }
+`;

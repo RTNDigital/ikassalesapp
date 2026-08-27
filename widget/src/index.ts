@@ -7,6 +7,10 @@ import { renderToast, removeToast, ToastHandle } from './renderer';
 import { renderTeaser } from './teaser';
 
 (function () {
+  // Prevent duplicate instances when multiple script tags exist
+  if ((window as any).__sn_widget_loaded) return;
+  (window as any).__sn_widget_loaded = true;
+
   // 1. Extract merchantId and baseUrl from script tag src
   const scriptEl = document.currentScript as HTMLScriptElement | null;
   if (!scriptEl) return;

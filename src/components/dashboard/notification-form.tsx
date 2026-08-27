@@ -26,23 +26,24 @@ export function NotificationForm({ token, onCreated }: NotificationFormProps) {
   const [customerName, setCustomerName] = useState('');
   const [location, setLocation] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
+  const [manualProductName, setManualProductName] = useState('');
   const [isPrioritized, setIsPrioritized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!customerName.trim() || !selectedProduct) return;
+    if (!isValid) return;
 
     setSubmitting(true);
     try {
       await ApiRequests.notifications.create(token, {
         customerName: customerName.trim(),
         location: location.trim(),
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        productImage: selectedProduct.image,
-        productHref: selectedProduct.href,
+        productId: selectedProduct?.id ?? null,
+        productName: selectedProduct?.name ?? manualProductName.trim(),
+        productImage: selectedProduct?.image ?? null,
+        productHref: selectedProduct?.href ?? null,
         isPrioritized,
       });
 
@@ -50,6 +51,7 @@ export function NotificationForm({ token, onCreated }: NotificationFormProps) {
       setCustomerName('');
       setLocation('');
       setSelectedProduct(null);
+      setManualProductName('');
       setIsPrioritized(false);
       onCreated();
     } catch (error) {
@@ -59,7 +61,7 @@ export function NotificationForm({ token, onCreated }: NotificationFormProps) {
     }
   };
 
-  const isValid = customerName.trim().length > 0 && selectedProduct !== null;
+  const isValid = customerName.trim().length > 0 && (selectedProduct !== null || manualProductName.trim().length > 0);
 
   return (
     <Card>
@@ -93,10 +95,28 @@ export function NotificationForm({ token, onCreated }: NotificationFormProps) {
             <Label>Ürün *</Label>
             <ProductSelector
               token={token}
-              onSelect={(product) => setSelectedProduct(product)}
+              onSelect={(product) => {
+                setSelectedProduct(product);
+                setManualProductName('');
+              }}
               selectedName={selectedProduct?.name ?? ''}
             />
           </div>
+
+          {!selectedProduct && (
+            <div className="space-y-2">
+              <Label htmlFor="manualProductName">veya Ürün Adını Yazın</Label>
+              <Input
+                id="manualProductName"
+                value={manualProductName}
+                onChange={(e) => setManualProductName(e.target.value)}
+                placeholder="Örn: Siyah Deri Çanta"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ürün araması çalışmıyorsa adı manuel girebilirsiniz.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <Label htmlFor="isPrioritized">Öncelikli</Label>
