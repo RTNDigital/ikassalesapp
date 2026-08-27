@@ -55,6 +55,40 @@ export interface ListProductQuery {
   listProduct: ListProductQueryData;
 }
 
+export type ListOrderQueryVariables = {
+  pagination?: PaginationInput;
+  sort?: string;
+}
+
+export type ListOrderQueryData = {
+  data: Array<{
+  id: string;
+  status: string;
+  createdAt?: number;
+  shippingAddress?: {
+  firstName: string;
+  city: {
+  name: string;
+};
+};
+  billingAddress?: {
+  firstName: string;
+  city: {
+  name: string;
+};
+};
+  orderLineItems: Array<{
+  variant: {
+  productId?: string;
+};
+}>;
+}>;
+}
+
+export interface ListOrderQuery {
+  listOrder: ListOrderQueryData;
+}
+
 export class GeneratedQueries {
   client: BaseGraphQLAPIClient<any>;
 
@@ -110,6 +144,38 @@ export class GeneratedQueries {
   }
 `;
     return this.client.query<Partial<ListProductQuery>>({ query, variables });
+  }
+
+  async listOrder(variables: ListOrderQueryVariables): Promise<APIResult<Partial<ListOrderQuery>>> {
+    const query = `
+  query listOrder($pagination: PaginationInput, $sort: String) {
+    listOrder(pagination: $pagination, sort: $sort) {
+      data {
+        id
+        status
+        createdAt
+        shippingAddress {
+          firstName
+          city {
+            name
+          }
+        }
+        billingAddress {
+          firstName
+          city {
+            name
+          }
+        }
+        orderLineItems {
+          variant {
+            productId
+          }
+        }
+      }
+    }
+  }
+`;
+    return this.client.query<Partial<ListOrderQuery>>({ query, variables });
   }
 }
 
