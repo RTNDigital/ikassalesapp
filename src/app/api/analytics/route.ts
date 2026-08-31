@@ -22,7 +22,13 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    const contentType = request.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else {
+      const text = await request.text();
+      body = JSON.parse(text);
+    }
   } catch {
     return new NextResponse(null, { status: 400, headers: CORS_HEADERS });
   }

@@ -1,5 +1,21 @@
 import { BaseGraphQLAPIClient, BaseGraphQLAPIClientOptions, APIResult } from '@ikas/admin-api-client';
 
+export type OrderStatusEnum = string;
+
+export enum StorefrontJSScriptContentTypeEnum {
+  FILE = "FILE",
+  SCRIPT = "SCRIPT"
+}
+
+export type CreateStorefrontJSScriptInput = {
+  contentType: StorefrontJSScriptContentTypeEnum;
+  fileName?: string;
+  isHighPriority?: boolean;
+  name: string;
+  scriptContent: string;
+  storefrontId: string;
+}
+
 export type PaginationInput = {
   limit?: number;
   page?: number;
@@ -55,6 +71,29 @@ export interface ListProductQuery {
   listProduct: ListProductQueryData;
 }
 
+export type ListStorefrontQueryVariables = {}
+
+export type ListStorefrontQueryData = Array<{
+  id: string;
+}>
+
+export interface ListStorefrontQuery {
+  listStorefront: ListStorefrontQueryData;
+}
+
+export type CreateStorefrontJSScriptMutationVariables = {
+  input: CreateStorefrontJSScriptInput;
+}
+
+export type CreateStorefrontJSScriptMutationData = {
+  id: string;
+  name: string;
+}
+
+export interface CreateStorefrontJSScriptMutation {
+  createStorefrontJSScript: CreateStorefrontJSScriptMutationData;
+}
+
 export type ListOrderQueryVariables = {
   pagination?: PaginationInput;
   sort?: string;
@@ -63,7 +102,7 @@ export type ListOrderQueryVariables = {
 export type ListOrderQueryData = {
   data: Array<{
   id: string;
-  status: string;
+  status: OrderStatusEnum;
   createdAt?: number;
   shippingAddress?: {
   firstName: string;
@@ -146,6 +185,17 @@ export class GeneratedQueries {
     return this.client.query<Partial<ListProductQuery>>({ query, variables });
   }
 
+  async listStorefront(): Promise<APIResult<Partial<ListStorefrontQuery>>> {
+    const query = `
+  query listStorefront {
+    listStorefront {
+      id
+    }
+  }
+`;
+    return this.client.query<Partial<ListStorefrontQuery>>({ query });
+  }
+
   async listOrder(variables: ListOrderQueryVariables): Promise<APIResult<Partial<ListOrderQuery>>> {
     const query = `
   query listOrder($pagination: PaginationInput, $sort: String) {
@@ -179,11 +229,33 @@ export class GeneratedQueries {
   }
 }
 
+export class GeneratedMutations {
+  client: BaseGraphQLAPIClient<any>;
+
+  constructor(client: BaseGraphQLAPIClient<any>) {
+    this.client = client;
+  }
+
+  async createStorefrontJSScript(variables: CreateStorefrontJSScriptMutationVariables): Promise<APIResult<Partial<CreateStorefrontJSScriptMutation>>> {
+    const mutation = `
+  mutation createStorefrontJSScript($input: CreateStorefrontJSScriptInput!) {
+    createStorefrontJSScript(input: $input) {
+      id
+      name
+    }
+  }
+`;
+    return this.client.mutate<Partial<CreateStorefrontJSScriptMutation>>({ mutation, variables });
+  }
+}
+
 export class ikasAdminGraphQLAPIClient<TokenData> extends BaseGraphQLAPIClient<TokenData> {
   queries: GeneratedQueries;
+  mutations: GeneratedMutations;
 
   constructor(options: BaseGraphQLAPIClientOptions<TokenData>) {
     super(options);
     this.queries = new GeneratedQueries(this);
+    this.mutations = new GeneratedMutations(this);
   }
 }

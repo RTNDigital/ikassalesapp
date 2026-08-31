@@ -16,6 +16,6 @@ export function trackEvent(merchantId: string, eventType: 'impression' | 'click'
     device: isMobile() ? 'mobile' : 'desktop',
   });
   if (navigator.sendBeacon) {
-    navigator.sendBeacon(analyticsUrl, new Blob([payload], { type: 'application/json' }));
+    navigator.sendBeacon(analyticsUrl, new Blob([payload], { type: 'text/plain' }));
   }
 }

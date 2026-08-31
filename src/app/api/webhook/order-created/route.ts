@@ -97,9 +97,11 @@ export async function POST(request: NextRequest) {
     (order.customerFirstName as string) ??
     'Müşteri';
 
+  const shippingCity = shippingAddress?.city;
+  const billingCity = billingAddress?.city;
   const location =
-    (shippingAddress?.city as string) ??
-    (billingAddress?.city as string) ??
+    (typeof shippingCity === 'object' && shippingCity !== null ? (shippingCity as Record<string, unknown>).name as string : shippingCity as string) ??
+    (typeof billingCity === 'object' && billingCity !== null ? (billingCity as Record<string, unknown>).name as string : billingCity as string) ??
     (shippingAddress?.state as string) ??
     '';
 
