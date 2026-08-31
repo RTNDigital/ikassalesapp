@@ -41,6 +41,23 @@ export const LIST_PRODUCT = gql`
   }
 `;
 
+export const LIST_STOREFRONT = gql`
+  query listStorefront {
+    listStorefront {
+      id
+    }
+  }
+`;
+
+export const CREATE_STOREFRONT_JS_SCRIPT = gql`
+  mutation createStorefrontJSScript($input: CreateStorefrontJSScriptInput!) {
+    createStorefrontJSScript(input: $input) {
+      id
+      name
+    }
+  }
+`;
+
 export const LIST_ORDER = gql`
   query listOrder($pagination: PaginationInput, $sort: String) {
     listOrder(pagination: $pagination, sort: $sort) {
