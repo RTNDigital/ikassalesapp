@@ -51,7 +51,7 @@ export async function GET(
     },
     orderBy: [
       { isPrioritized: 'desc' },
-      { createdAt: 'desc' },
+      { purchaseDate: 'desc' },
     ],
   });
 

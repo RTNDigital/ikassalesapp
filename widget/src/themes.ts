@@ -138,17 +138,25 @@ export function getThemeCSS(theme: string, colors: ThemeColors): string {
       flex-shrink: 0;
     }
 
-    /* --- Modern: slightly different text style --- */
-    .sn-modern .sn-title {
-      font-size: 13px;
+    /* --- Modern: angular/squared design --- */
+    .sn-toast.sn-modern-toast {
+      border-radius: 4px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     }
     .sn-modern .sn-img-wrap {
       width: 60px;
       height: 60px;
-      border-radius: 8px;
+      border-radius: 4px;
+    }
+    .sn-modern .sn-cta {
+      border-radius: 2px;
     }
 
-    /* --- Minimal: no image, dot indicator --- */
+    /* --- Minimal: no image, dot indicator, sharp corners --- */
+    .sn-toast.sn-minimal-toast {
+      border-radius: 2px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+    }
     .sn-minimal-inner {
       gap: 10px;
     }

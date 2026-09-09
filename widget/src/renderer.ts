@@ -146,7 +146,8 @@ export function renderToast(
   const meta = fillTemplate(settings.timeTemplate, vars);
   const hasProductLink = !!notification.productHref;
 
-  const toast = el('div', `sn-toast ${settings.position} sn-enter`);
+  const themeClass = settings.theme === 'modern' ? 'sn-modern-toast' : settings.theme === 'minimal' ? 'sn-minimal-toast' : '';
+  const toast = el('div', `sn-toast ${settings.position} ${themeClass} sn-enter`.trim());
 
   let inner: HTMLElement;
   if (settings.theme === 'modern') {
