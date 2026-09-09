@@ -57,10 +57,21 @@ export async function POST(request: Request) {
 
   const orders = orderResponse.data.listOrder.data ?? [];
 
+  // First sync: set baseline timestamp and return without importing old orders
+  if (!lastSyncedAt) {
+    await prisma.storeSettings.update({
+      where: { merchantId: user.merchantId },
+      data: { lastSyncedAt: new Date() },
+    });
+    return NextResponse.json({
+      data: { synced: 0, ordersProcessed: 0, error: 'Senkronizasyon başlatıldı. Bundan sonraki yeni siparişler otomatik olarak eklenecektir.' },
+    });
+  }
+
   // Filter: valid status + newer than last sync
   const validOrders = orders.filter((o) => {
     if (o.status && EXCLUDED_STATUSES.includes(o.status)) return false;
-    if (lastSyncedAt && o.createdAt) {
+    if (o.createdAt) {
       const orderDate = new Date(o.createdAt);
       if (orderDate <= lastSyncedAt) return false;
     }
@@ -68,15 +79,12 @@ export async function POST(request: Request) {
   });
 
   if (validOrders.length === 0) {
-    // Update lastSyncedAt even when no new orders, so next sync starts from now
-    if (settings) {
-      await prisma.storeSettings.update({
-        where: { merchantId: user.merchantId },
-        data: { lastSyncedAt: new Date() },
-      });
-    }
+    await prisma.storeSettings.update({
+      where: { merchantId: user.merchantId },
+      data: { lastSyncedAt: new Date() },
+    });
     return NextResponse.json({
-      data: { synced: 0, ordersProcessed: 0, error: lastSyncedAt ? 'Son senkronizasyondan bu yana yeni sipariş yok.' : 'Geçerli sipariş bulunamadı.' },
+      data: { synced: 0, ordersProcessed: 0, error: 'Son senkronizasyondan bu yana yeni sipariş yok.' },
     });
   }
 
