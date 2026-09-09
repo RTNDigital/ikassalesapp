@@ -57,21 +57,10 @@ export async function POST(request: Request) {
 
   const orders = orderResponse.data.listOrder.data ?? [];
 
-  // First sync: set baseline timestamp and return without importing old orders
-  if (!lastSyncedAt) {
-    await prisma.storeSettings.update({
-      where: { merchantId: user.merchantId },
-      data: { lastSyncedAt: new Date() },
-    });
-    return NextResponse.json({
-      data: { synced: 0, ordersProcessed: 0, error: 'Senkronizasyon başlatıldı. Bundan sonraki yeni siparişler otomatik olarak eklenecektir.' },
-    });
-  }
-
-  // Filter: valid status + newer than last sync
+  // Filter: valid status only (first sync), or valid status + newer than last sync
   const validOrders = orders.filter((o) => {
     if (o.status && EXCLUDED_STATUSES.includes(o.status)) return false;
-    if (o.createdAt) {
+    if (lastSyncedAt && o.createdAt) {
       const orderDate = new Date(o.createdAt);
       if (orderDate <= lastSyncedAt) return false;
     }
@@ -84,7 +73,7 @@ export async function POST(request: Request) {
       data: { lastSyncedAt: new Date() },
     });
     return NextResponse.json({
-      data: { synced: 0, ordersProcessed: 0, error: 'Son senkronizasyondan bu yana yeni sipariş yok.' },
+      data: { synced: 0, ordersProcessed: 0, error: lastSyncedAt ? 'Son senkronizasyondan bu yana yeni sipariş yok.' : 'Geçerli sipariş bulunamadı.' },
     });
   }
 
@@ -216,9 +205,14 @@ export async function POST(request: Request) {
     });
   }
 
-  // INCREMENTAL: append new entries, then prune oldest if over limit
   await prisma.$transaction(async (tx) => {
-    // Create new entries
+    if (!lastSyncedAt) {
+      // First sync: replace all webhook entries with fresh data
+      await tx.notificationEntry.deleteMany({
+        where: { merchantId: user.merchantId, source: 'webhook' },
+      });
+    }
+
     for (const entry of newEntries) {
       await tx.notificationEntry.create({ data: entry });
     }
@@ -242,7 +236,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Update lastSyncedAt
     await tx.storeSettings.update({
       where: { merchantId: user.merchantId },
       data: { lastSyncedAt: new Date() },
