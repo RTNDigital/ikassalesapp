@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: [
       { isPrioritized: 'desc' },
-      { createdAt: 'desc' },
+      { purchaseDate: 'desc' },
     ],
   });
 
