@@ -1,7 +1,5 @@
 import { BaseGraphQLAPIClient, BaseGraphQLAPIClientOptions, APIResult } from '@ikas/admin-api-client';
 
-export type OrderStatusEnum = string;
-
 export enum StorefrontJSScriptContentTypeEnum {
   FILE = "FILE",
   SCRIPT = "SCRIPT"
@@ -14,6 +12,17 @@ export type CreateStorefrontJSScriptInput = {
   name: string;
   scriptContent: string;
   storefrontId: string;
+}
+
+export type DateFilterInput = {
+  eq?: number;
+  gt?: number;
+  gte?: number;
+  in?: Array<number>;
+  lt?: number;
+  lte?: number;
+  ne?: number;
+  nin?: Array<number>;
 }
 
 export type PaginationInput = {
@@ -97,13 +106,15 @@ export interface CreateStorefrontJSScriptMutation {
 export type ListOrderQueryVariables = {
   pagination?: PaginationInput;
   sort?: string;
+  orderedAt?: DateFilterInput;
 }
 
 export type ListOrderQueryData = {
   data: Array<{
   id: string;
-  status: OrderStatusEnum;
+  status: string;
   createdAt?: number;
+  orderedAt?: number;
   shippingAddress?: {
   firstName: string;
   city: {
@@ -198,12 +209,13 @@ export class GeneratedQueries {
 
   async listOrder(variables: ListOrderQueryVariables): Promise<APIResult<Partial<ListOrderQuery>>> {
     const query = `
-  query listOrder($pagination: PaginationInput, $sort: String) {
-    listOrder(pagination: $pagination, sort: $sort) {
+  query listOrder($pagination: PaginationInput, $sort: String, $orderedAt: DateFilterInput) {
+    listOrder(pagination: $pagination, sort: $sort, orderedAt: $orderedAt) {
       data {
         id
         status
         createdAt
+        orderedAt
         shippingAddress {
           firstName
           city {

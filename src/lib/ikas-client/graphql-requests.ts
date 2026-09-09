@@ -59,12 +59,13 @@ export const CREATE_STOREFRONT_JS_SCRIPT = gql`
 `;
 
 export const LIST_ORDER = gql`
-  query listOrder($pagination: PaginationInput, $sort: String) {
-    listOrder(pagination: $pagination, sort: $sort) {
+  query listOrder($pagination: PaginationInput, $sort: String, $orderedAt: DateFilterInput) {
+    listOrder(pagination: $pagination, sort: $sort, orderedAt: $orderedAt) {
       data {
         id
         status
         createdAt
+        orderedAt
         shippingAddress {
           firstName
           city {

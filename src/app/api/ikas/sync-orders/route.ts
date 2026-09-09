@@ -36,10 +36,14 @@ export async function POST(request: Request) {
 
   const ikasClient = getIkas(authToken);
 
-  const orderResponse = await ikasClient.queries.listOrder({
+  const orderVars: { pagination: { limit: number; page: number }; sort: string; orderedAt?: { gte: number } } = {
     pagination: { limit: 100, page: 1 },
-    sort: '-createdAt',
-  });
+    sort: '-orderedAt',
+  };
+  if (lastSyncedAt) {
+    orderVars.orderedAt = { gte: lastSyncedAt.getTime() };
+  }
+  const orderResponse = await ikasClient.queries.listOrder(orderVars);
 
   if (!orderResponse.isSuccess || !orderResponse.data?.listOrder) {
     console.error(
@@ -57,13 +61,8 @@ export async function POST(request: Request) {
 
   const orders = orderResponse.data.listOrder.data ?? [];
 
-  // Filter: valid status only (first sync), or valid status + newer than last sync
   const validOrders = orders.filter((o) => {
     if (o.status && EXCLUDED_STATUSES.includes(o.status)) return false;
-    if (lastSyncedAt && o.createdAt) {
-      const orderDate = new Date(o.createdAt);
-      if (orderDate <= lastSyncedAt) return false;
-    }
     return true;
   });
 
@@ -182,7 +181,7 @@ export async function POST(request: Request) {
         productName: product.name,
         productImage: imageUrl,
         productHref: product.slug ? `/${product.slug}` : null,
-        purchaseDate: order.createdAt ? new Date(order.createdAt) : new Date(),
+        purchaseDate: order.orderedAt ? new Date(order.orderedAt) : order.createdAt ? new Date(order.createdAt) : new Date(),
         isPrioritized: false,
         isActive: true,
       });
