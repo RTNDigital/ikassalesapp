@@ -19,8 +19,6 @@ const EXCLUDED_STATUSES = [
 ];
 
 const PRODUCT_PAGE_LIMIT = 100;
-// Safety cap on product pagination so a very large catalog can't loop forever
-// while we search for the (small) set of productIds referenced by recent orders.
 const MAX_PRODUCT_PAGES = 50;
 
 export async function POST(request: Request) {
@@ -34,10 +32,10 @@ export async function POST(request: Request) {
     where: { merchantId: user.merchantId },
   });
   const maxNotifications = settings?.syncOrderCount ?? 20;
+  const lastSyncedAt = settings?.lastSyncedAt;
 
   const ikasClient = getIkas(authToken);
 
-  // 1. Fetch recent orders via getIkas (auto token refresh on expiry)
   const orderResponse = await ikasClient.queries.listOrder({
     pagination: { limit: 100, page: 1 },
     sort: '-createdAt',
@@ -59,16 +57,30 @@ export async function POST(request: Request) {
 
   const orders = orderResponse.data.listOrder.data ?? [];
 
-  // 2. Filter valid orders
-  const validOrders = orders.filter((o) => !o.status || !EXCLUDED_STATUSES.includes(o.status));
+  // Filter: valid status + newer than last sync
+  const validOrders = orders.filter((o) => {
+    if (o.status && EXCLUDED_STATUSES.includes(o.status)) return false;
+    if (lastSyncedAt && o.createdAt) {
+      const orderDate = new Date(o.createdAt);
+      if (orderDate <= lastSyncedAt) return false;
+    }
+    return true;
+  });
 
   if (validOrders.length === 0) {
+    // Update lastSyncedAt even when no new orders, so next sync starts from now
+    if (settings) {
+      await prisma.storeSettings.update({
+        where: { merchantId: user.merchantId },
+        data: { lastSyncedAt: new Date() },
+      });
+    }
     return NextResponse.json({
-      data: { synced: 0, ordersProcessed: 0, error: 'Geçerli sipariş bulunamadı.' },
+      data: { synced: 0, ordersProcessed: 0, error: lastSyncedAt ? 'Son senkronizasyondan bu yana yeni sipariş yok.' : 'Geçerli sipariş bulunamadı.' },
     });
   }
 
-  // 3. Collect unique productIds referenced by valid orders
+  // Collect unique productIds referenced by valid orders
   const productIds = new Set<string>();
   for (const order of validOrders) {
     for (const item of order.orderLineItems ?? []) {
@@ -76,10 +88,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // 4. Fetch product details via getIkas (auto token refresh). listProduct only
-  //    supports search/pagination (no id-array filter), so page through the
-  //    catalog and match client-side against the needed productIds, stopping
-  //    early once every needed product has been resolved.
+  // Fetch product details
   const productMap = new Map<string, { name: string; slug: string; imageId: string | null }>();
 
   for (let page = 1; page <= MAX_PRODUCT_PAGES; page++) {
@@ -113,7 +122,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Stop once every referenced product is resolved, or we've hit the last page.
     if (productMap.size >= productIds.size || pageData.length < PRODUCT_PAGE_LIMIT) break;
   }
 
@@ -127,8 +135,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // 5. Build new entries in memory FIRST (atomic swap — never delete before we
-  //    know we have replacement data)
+  // Build new entries from only NEW orders
   const newEntries: {
     merchantId: string;
     source: string;
@@ -158,13 +165,12 @@ export async function POST(request: Request) {
       const pid = item.variant?.productId;
       if (!pid) continue;
 
-      // Skip duplicate products across orders
       const dedupKey = `${customerName}-${pid}`;
       if (seenProducts.has(dedupKey)) continue;
       seenProducts.add(dedupKey);
 
       const product = productMap.get(pid);
-      if (!product) continue; // Product deleted/inactive, or not found within page cap
+      if (!product) continue;
 
       const imageUrl = product.imageId
         ? `https://cdn.myikas.com/images/${user.merchantId}/${product.imageId}/180/${product.imageId}.webp`
@@ -187,6 +193,12 @@ export async function POST(request: Request) {
   }
 
   if (newEntries.length === 0) {
+    if (settings) {
+      await prisma.storeSettings.update({
+        where: { merchantId: user.merchantId },
+        data: { lastSyncedAt: new Date() },
+      });
+    }
     return NextResponse.json({
       data: {
         synced: 0,
@@ -196,14 +208,38 @@ export async function POST(request: Request) {
     });
   }
 
-  // 6. ATOMIC SWAP: delete old + create new in a single transaction. If create
-  //    fails for any reason, the delete is rolled back too — no data loss.
-  await prisma.$transaction([
-    prisma.notificationEntry.deleteMany({
+  // INCREMENTAL: append new entries, then prune oldest if over limit
+  await prisma.$transaction(async (tx) => {
+    // Create new entries
+    for (const entry of newEntries) {
+      await tx.notificationEntry.create({ data: entry });
+    }
+
+    // Prune oldest webhook entries if total exceeds limit
+    const totalWebhook = await tx.notificationEntry.count({
       where: { merchantId: user.merchantId, source: 'webhook' },
-    }),
-    ...newEntries.map((entry) => prisma.notificationEntry.create({ data: entry })),
-  ]);
+    });
+
+    if (totalWebhook > maxNotifications) {
+      const toDelete = await tx.notificationEntry.findMany({
+        where: { merchantId: user.merchantId, source: 'webhook' },
+        orderBy: { purchaseDate: 'asc' },
+        take: totalWebhook - maxNotifications,
+        select: { id: true },
+      });
+      if (toDelete.length > 0) {
+        await tx.notificationEntry.deleteMany({
+          where: { id: { in: toDelete.map((e) => e.id) } },
+        });
+      }
+    }
+
+    // Update lastSyncedAt
+    await tx.storeSettings.update({
+      where: { merchantId: user.merchantId },
+      data: { lastSyncedAt: new Date() },
+    });
+  });
 
   return NextResponse.json({
     data: { synced: newEntries.length, ordersProcessed: validOrders.length },

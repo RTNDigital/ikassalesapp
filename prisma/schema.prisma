@@ -52,6 +52,7 @@ model StoreSettings {
   teaserText       String   @default("Son satışlar")
   teaserBehavior   String   @default("after-close")
   pageTargeting    String   @default("{\"mode\":\"all\"}")
+  lastSyncedAt     DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
